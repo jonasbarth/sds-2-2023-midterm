@@ -1,0 +1,93 @@
+---
+title: "Moodle-Quiz-Continuous-Conjugate"
+author: "Jonas Barth"
+date: "2023-04-25"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# Task
+Suppose we have observed the following 20 conditionally i.i.d. normal random variables with unknown mean $\theta$ (theta) and known variance $\sigma^2=100$.
+
+```{r}
+y = c( 103.25,88.37,88.95,104.81,92.27,75.01,80.79,83.2,99.9,91.26,91.67,88.77,82.1,105.53,92.64,67.99,94.67,82.93,76.98,85.48)
+n = length(y)
+
+known.var = 100
+```
+
+We want to carry out some conjugate Bayesian analysis using as a prior distribution a suitable distribution with mean $\mu_0 = 75$ and variance $\tau^2_0 = 1.25$.
+
+```{r}
+prior.mu = 75
+prior.var = 1.25
+```
+
+
+# Provide the posterior mode as a point estimate
+First, I need to update the $\mu$ and $\sigma$ parameters.
+
+$$\begin{aligned}
+\mu^* &= \frac{1}{\frac{1}{\tau^2_0} + \frac{n}{\sigma^2}} \left(\frac{1}{\tau^2_0} \mu_0 + \frac{n}{\sigma^2} \bar{y}\right) \\
+\tau^2_* &= \left(\frac{1}{\tau^2_0} + \frac{n}{\sigma^2}\right)^{-1}
+\end{aligned}$$
+
+```{r}
+post.mu = (((1/ prior.var) * prior.mu) + ((n / known.var) * mean(y)))
+post.mu = post.mu / ((1 / prior.var) + (n / known.var))
+post.var = 1 / ((1 / prior.var) + (n / known.var))
+```
+
+The mode of the posterior distribution should be $77.7657$ but is:
+```{r}
+post.mu
+```
+
+# Credible Interval 
+Provide the shortest credible interval for the unknown parameter $\theta$ corresponding to 0.8 posterior probability:
+
+```{r}
+alpha = 0.8
+library(TeachingDemos)
+
+icdf = function(x) {
+  return(qnorm(x, post.mu, sqrt(post.var)))
+}
+
+hpd(icdf, conf=alpha)
+```
+# Posterior Probability
+Provide your posterior probability corresponding to the hypothesis that the unknown parameter $\theta \le 75.7657$.
+
+```{r}
+pnorm(75.7657, post.mu, sqrt(post.var))
+```
+
+# Prior Odds
+What are the prior odds corresponding to the same hypothesis that the unknown parameter $\theta \le 75.7657$?
+
+The prior odds are the probability of the event happening divided by the probability of the event **NOT** happening.
+```{r}
+prior.odds = pnorm(75.7657, prior.mu, sqrt(prior.var)) / (1 - pnorm(75.7657, prior.mu, sqrt(prior.var)))
+prior.odds
+```
+
+# Bayes Factor
+Compute the Bayes factor $B_{01}$ for comparing the two alternative hypotheses $H_0: \theta$  versus $H_1: \theta > 75.7657$.
+
+To compute the Bayes Factor we divide the posterior odds by the prior odds.
+
+```{r}
+posterior.odds = pnorm(75.7657, post.mu, sqrt(post.var)) / (1 - pnorm(75.7657, post.mu, sqrt(post.var)))
+
+bayes.factor = posterior.odds / prior.odds
+bayes.factor
+```
+
+
+
+
+

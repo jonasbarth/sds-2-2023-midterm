@@ -1,0 +1,123 @@
+---
+title: "predictive-distributions"
+author: "Jonas Barth"
+date: "2023-04-26"
+output: html_document
+---
+
+# Prior Predictive Distribution
+We use the prior predictive distribution to get an idea about what kind of data we can expect, given that we have chosen a specific prior $\pi(\theta)$.
+
+What we are interested in, is the marginal distribution of our data $p(y)$. To get to this distribution, we just integrate out the parameter $\theta$.
+
+$$\begin{aligned}
+p(y) &= \int\limits_{\theta \in \Theta} p(y, \theta) d\theta \\
+&= \int\limits_{\theta \in \Theta} p(y | \theta)\pi(\theta) d\theta \\
+\end{aligned}$$
+
+## Binomial Example
+Say we have some Binomial data $y$ and a Beta prior $\pi(\theta) \sim Beta(a, b)$. Then the prior predictive distribution is:
+
+$$\begin{aligned}
+p(y) &= \frac{\Gamma(n + 1) \Gamma(a + b)\Gamma(y + a)\Gamma(n - y + b)}{\Gamma(y + 1)\Gamma(n-y+1)\Gamma(a)\Gamma(b)\Gamma(a + b + n)}
+\end{aligned}$$
+
+```{r}
+prior.pred.binom = function(y, n, a, b) {
+  return((gamma(n + 1) * gamma(a + b) * gamma(y + a) * gamma(n - y + b)) / (gamma(y + 1) * gamma(n - y + 1) * gamma(a) * gamma(b) * gamma(a + b + n)))
+}
+```
+
+Which for a prior with $a = 1, b = 10$ looks like this.
+
+```{r}
+a = 1
+b = 10
+curve(dbeta(x, a, b), lwd = 2, col = "blue")
+```
+Plotting the prior predictive distribution, we see that it follows the same shape as the prior that we chose.
+```{r}
+x = 0:10
+n_1 = length(x)
+y_probs = sapply(x, function(x) prior.pred.binom(x, n_1, a, b))
+plot(x, y_probs)
+```
+
+# Posterior Predictive Distribution
+This is the new distribution of our data $p(y')$, once we have observed a sample $y$.
+
+$$\begin{aligned}
+p(y' | y) &= \int\limits_{\theta \in \Theta} p(y', y, \theta) d\theta \\
+&= \int\limits_{\theta \in \Theta} p(y' | y, \theta)\pi(\theta | y) d\theta \\
+\end{aligned}$$
+
+## Binomial Example
+This is actually just a beta binomial distribution, which is a mixture of the Beta and the Binomial distributions, parameterised by $(n, a, b)$.
+
+$$
+Beta-Binomial(n, a, b) = {n\choose y} \frac{B(y + a, n - y + b)}{B(a, b)}
+$$
+
+Our parameters for this model are:
+
+$$\begin{aligned}
+Beta-Binomial(n', y + a, n - y + b)
+\end{aligned}$$
+```{r}
+y_obs = c(0, 1, 0, 0, 0, 0, 1, 1, 0, 1)
+n_2 = length(y_obs)
+
+beta.binom = function(x, n, a, b) {
+  return(choose(n, x) * ((beta(x + a, n - x + b) / beta(a, b))))
+}
+```
+
+The updated posterior density for $\theta$.
+```{r}
+curve(dbeta(x, a + sum(y_obs), n_2 + b - sum(y_obs)))
+```
+
+The posterior predictive distribution for the binomial model. This follows the distribution of the posterior distribution.
+```{r}
+x = 0:10
+y = sapply(x, function(x) beta.binom(x, n_2, a + sum(y_obs), n_1 + b - sum(y_obs)))
+
+plot(x, y)
+```
+
+## Sampling
+To sample from the posterior predictive distribution, we can use Monte Carlo, since we are just approximating an integral.
+
+Say we have a **Gamma prior** for a **Poisson likelihood**, and observe the vector `y_obs`.
+```{r}
+shape.prior = 1
+rate.prior = 10
+
+y_obs = c(0,1,9,4,20,8,10,18,56,2,5,3,8,13,25)
+n = length(y_obs)
+
+shape.post = shape.prior + sum(y_obs)
+rate.post = rate.prior + n
+
+```
+
+First, we sample a $\theta$ vector from the **posterior** distribution.
+```{r}
+mc.theta = rgamma(10^4, shape.post, rate.post)
+```
+
+Then we sample from the poisson, using the obtained thetas. Plotting it, we see that given our posterior update, we can expect values around 5-7.
+```{r}
+mc.pois = rpois(10^4, mc.theta)
+hist(mc.pois, probability = TRUE)
+```
+
+Now let's check what the probability is for getting a $5$ from our posterior predictive distribution. We just sample from the poisson, using our theta vector, but this time for a single **target value**. Finally, we average and find that the value is close to what we see in the histogram.
+```{r}
+target = 5
+
+mc.target = dpois(target, mc.theta)
+
+mean(mc.target)
+```
+
